@@ -1,16 +1,21 @@
 {application, wishvpn,
- [{description, "An OTP application"},
-  {vsn, "0.1.0"},
-  {registered, []},
-  {mod, { wishvpn_app, []}},
-  {applications,
-   [kernel,
-    stdlib
-   ]},
-  {env,[]},
-  {modules, []},
+  [{description, "A modern SSL/VPN client/server written in Erlang"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {wishvpn_app, []}},
+    {applications,
+      [kernel,
+        stdlib,
+        ssl,
+        lager,
+        cowboy,
+        grpc,
+        tunctl
+        ]},
+    {env, []},
+    {modules, []},
 
-  {maintainers, []},
-  {licenses, ["Apache 2.0"]},
-  {links, []}
- ]}.
+    {maintainers, []},
+    {licenses, ["Apache 2.0"]},
+    {links, []}
+  ]}.
