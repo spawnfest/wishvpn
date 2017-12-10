@@ -101,4 +101,89 @@ Build release
 
     $ rebar3 as prod tar
     
+If you really want to try the code
+-----
+
+You need 2 peers to test the app. You can for example use your host and a virtual 
+machine in your host, or 2 VMs hosted in your computer.
+The code runs on Linux/MacOS/Windows. I tested it on Linux and MacOS. On Linux
+you don't need to install anything if your kernel supports TUN/TAP. In MacOS you 
+need TUN/TAP drivers (you can install them with `brew install caskroom/cask/tuntap`)
+or just dowload from http://tuntaposx.sourceforge.net . Beware of permissions 
+(see https://github.com/msantos/tunctl to set privileges).
+I developed the code on the Mac using docker and 2 virtualbox VMs.
+Install docker-machine and create 2 VMs:
+
+    $ docker-machine create -d virtualbox vm1
+    $ docker-machine create -d virtualbox vm2
+    
+Check in `sys1.config` and `sys2.config` if IPs are set correctly.
+They are set to `{ip, "192.168.99.100"}` and `{remote_ip, "192.168.99.100"}`.
+
+My first VM act as the server and has `192.168.99.100` assigned.
+The second VM act as the client and has `192.168.99.101` assigned.
+The 2 VMs reach each other using this subnet.
+You can find your VM IP running
+
+    $ docker-machine ip vm1
+    192.168.99.100
+and
+
+    $ docker-machine ip vm2
+    192.168.99.101
+    
+In your host start shell #1 and start the server:
+
+    $ eval $(docker-machine env vm1)
+    $ docker run --name wishvpn -it --rm --cap-add=NET_ADMIN \
+      --device /dev/net/tun --net=host -v ${HOME}/.ssh:/root/.ssh \
+      -v ${PWD}:${PWD} -w ${PWD} erlang:20.1 \
+      rebar3 shell --sname wpn --setcookie secret --apps wishvpn \
+      --config config/sys1.config
+
+Unfortunately you have to assign IP manually 
+
+    $ docker exec -it wishvpn ip addr add 10.8.0.1/24 dev tun0
+    $ docker exec -it wishvpn ip link set tun0 up
+
+Start shell #2
+
+    $ eval $(docker-machine env vm2)
+    $ docker run --name wishvpn -it --rm --cap-add=NET_ADMIN \
+      --device /dev/net/tun --net=host -v ${HOME}/.ssh:/root/.ssh \
+      -v ${PWD}:${PWD} -w ${PWD} erlang:20.1 \
+      rebar3 shell --sname wpn --setcookie secret --apps wishvpn \
+      --config config/sys2.config
+
+Unfortunately you have to assign IP manually
+
+    $ docker exec -it wishvpn ip addr add 10.8.0.2/24 dev tun0
+    $ docker exec -it wishvpn ip link set tun0 up
+
+      
+If everything is set up correctly you can ping VM1 from VM2 and viceversa.
+
+    vm1$ docker exec -it wishvpn ping 10.8.0.2 -c 3
+    PING 10.8.0.2 (10.8.0.2): 56 data bytes
+    64 bytes from 10.8.0.2: icmp_seq=0 ttl=64 time=1.304 ms
+    64 bytes from 10.8.0.2: icmp_seq=1 ttl=64 time=1.582 ms
+    64 bytes from 10.8.0.2: icmp_seq=2 ttl=64 time=1.936 ms
+    --- 10.8.0.2 ping statistics ---
+    3 packets transmitted, 3 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.304/1.607/1.936/0.259 ms
+    
+and
+
+    vm2$ docker exec -it wishvpn ping 10.8.0.1 -c 3
+    PING 10.8.0.1 (10.8.0.1): 56 data bytes
+    64 bytes from 10.8.0.1: icmp_seq=0 ttl=64 time=1.322 ms
+    64 bytes from 10.8.0.1: icmp_seq=1 ttl=64 time=1.561 ms
+    64 bytes from 10.8.0.1: icmp_seq=2 ttl=64 time=1.461 ms
+    --- 10.8.0.1 ping statistics ---
+    3 packets transmitted, 3 packets received, 0% packet loss
+    round-trip min/avg/max/stddev = 1.322/1.448/1.561/0.098 ms
+
+
+[Wireshark capture](docs/wishvpn_dtls_wireshark.png)
+
 by colrack
