@@ -1,5 +1,5 @@
 {application, wishvpn,
-  [{description, "A modern SSL/VPN client/server written in Erlang"},
+  [{description, "SSL/VPN client/server written in Erlang"},
     {vsn, "0.1.0"},
     {registered, []},
     {mod, {wishvpn_app, []}},
@@ -8,6 +8,7 @@
         stdlib,
         ssl,
         lager,
+        ssl_verify_fun,
         cowboy,
         grpc,
         tunctl

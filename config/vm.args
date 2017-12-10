@@ -1,0 +1,6 @@
+-sname wishvpn
+
+-setcookie secret
+
++K true
++A30
