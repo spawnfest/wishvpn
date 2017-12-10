@@ -10,7 +10,7 @@ https://tools.ietf.org/html/rfc6347).
 The ssl app seems to support DTLS and OTP guys at Ericsson are currently 
 working on it (see https://github.com/erlang/otp/commits/master/lib/ssl and 
 filter for `DTLS`). In OTP 20.1, the API is the same as the SSL/TLS.
-You only need to pass the tuple {protocol, dtls} in Options list intead of 
+You only need to pass the tuple {protocol, dtls} instead of 
 {protocol, tls} in the `connect/X` and `listen/X` functions (client and server 
 respectively).
 DTLS is applicable both for UDP and SCTP; here we are using UDP sockets.
@@ -37,7 +37,12 @@ Here is the protocol stack for user data in wishvpn.
 └─────────┘         └────────┘
 ```
 
-I wanted to separate the control plane from 
+In future I want to separate the signalling data (used for establish a session)
+from the user data.
+To establish a DTLS data session, the client communicate with the server over 
+GRPC. The server authenticate the client using eg username+password; the server 
+release the data to let the client authenticate in the data session.
+
 ```
 ┌────────┐         ┌────────┐
 │  GRPC  │─────────│  GRPC  │
@@ -52,7 +57,11 @@ I wanted to separate the control plane from
 └────────┘         └────────┘
 ```
 
-Here is wishvpn aimed architecture (of course is not so now)
+Here is wishvpn aimed architecture (of course is not like this now).
+An web server backed with cowboy is serving REST API that let a local client
+(eg a Command line interface app) control the main application that runs as as
+a system service.
+
 ```
     ┌─────────────────────────────────┐    ┌─────────────────────────────────┐
     │         wishvpn client          │    │         wishvpn server          │
@@ -75,7 +84,9 @@ Here is wishvpn aimed architecture (of course is not so now)
                   CLI / Browser                    CLI / Browser
 ```
 
-The packet forwarding model
+The packet forwarding model will be as below.
+Now only PDR and FAR are used.
+
 ```
             ┌───────────────────────────────────────────────────────────────────────────┐
             │                                  ┌──────┐      ┌────┐   ┌────┐    ┌────┐  │
@@ -89,6 +100,14 @@ The packet forwarding model
             │                                  └──────┘                                 │
             └───────────────────────────────────────────────────────────────────────────┘
 ```
+
+```
+PDR = Packet Detection Rule
+FAR = Forwarding Action Rule
+QER = QoS Enforcement Rule
+URR = Usage Report Rule
+```
+
 Thank you, dear judge, to waste your time trying to dig in this crappy code! :)
 
 Build
