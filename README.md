@@ -58,7 +58,7 @@ release the data to let the client authenticate in the data session.
 ```
 
 Here is wishvpn aimed architecture (of course is not like this now).
-An web server backed with cowboy is serving REST API that let a local client
+A web server backed with cowboy is serving REST API that let a local client
 (eg a Command line interface app) control the main application that runs as as
 a system service.
 
@@ -118,7 +118,7 @@ Build
 Build release
 -----
 
-    $ rebar3 as prod tar
+    $ rebar3 as prod tar --sys_config config/sys1.config
     
 If you really want to try the code
 -----
