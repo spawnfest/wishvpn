@@ -28,7 +28,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, { net_tun, net_tun_fd }).
+-record(state, {net_tun, net_tun_fd}).
 
 %%%===================================================================
 %%% API
@@ -69,8 +69,8 @@ start_link(Name, Iface) ->
   {stop, Reason :: term()} | ignore).
 init([Name, Iface]) ->
   {ok, TunRef} = tuncer:create(Iface, [{active, true}, tun, no_pi]),
-  ok = tuncer:up(TunRef, {0,0,0,0}),
-  ok = tuncer:persist(TunRef, false),
+%%  ok = tuncer:up(TunRef, {10,0,0,0}),
+%%  ok = tuncer:persist(TunRef, false),
   TunFd = tuncer:getfd(TunRef),
   erlang:register(list_to_atom(Name), self()),
   {ok, #state{net_tun = TunRef, net_tun_fd = TunFd}}.
@@ -90,7 +90,7 @@ init([Name, Iface]) ->
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), Reply :: term(), NewState :: #state{}} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_call({send, Data}, _From, #state{ net_tun_fd = TunFd} = State) ->
+handle_call({send, Data}, _From, #state{net_tun_fd = TunFd} = State) ->
   tuncer:write(TunFd, Data),
   {reply, ok, State};
 handle_call(_Request, _From, State) ->
@@ -124,36 +124,10 @@ handle_cast(_Request, State) ->
   {noreply, NewState :: #state{}} |
   {noreply, NewState :: #state{}, timeout() | hibernate} |
   {stop, Reason :: term(), NewState :: #state{}}).
-handle_info({tuntap, _Ref, <<4:4, _IHL:4, _:11/binary, _Src:4/binary,
+handle_info({tuntap, _Ref, <<4:4, _IHL:4, _:11/binary, Src:4/binary,
   Dst:4/binary, _/binary>> = Pkt}, State) ->
-  IP = list_to_tuple(binary_to_list(Dst)),
-  case ets:lookup(?TABLE_PDR_IPV4, IP) of
-    [#pdr_ipv4_record{pdrs = PDRs}] ->
-      #pdr_record_ref{cert_fingerprint = CF, pdr_id = PdrId} =
-        wpn_srv:get_highest_pdr(PDRs),
-
-      PdrRecordKey = #pdr_record_key{cert_fingerprint = CF, pdr_id = PdrId},
-      #pdr_record{far_id = FarId} = wpn_srv:get_pdr_record(PdrRecordKey),
-
-      FarRecordKey = #far_record_key{cert_fingerprint = CF, far_id = FarId},
-
-      #far_record{apply_actions = ApplyActions,
-        forwarding_params = #forwarding_params{
-          destination_iface = 'DTLS',
-          network_instance = _NI,
-          outer_header_creation = #outer_header_creation{
-            hdr = 'UDP/DTLS/IPv4',
-            sock = DTLSSock
-          }
-        }} = wpn_srv:get_far_record(FarRecordKey),
-
-      case lists:member(forw, ApplyActions) of
-        true -> ssl:send(DTLSSock, Pkt);
-        _ -> ok
-      end,
-    ok;
-    _ -> drop, lager:debug("Dropping data for ~p~n ~p", [IP, Pkt])
-  end,
+  IpDst = list_to_tuple(binary_to_list(Dst)),
+  handle_pkt(IpDst, Pkt),
   {noreply, State};
 handle_info({tuntap, _Ref, <<6:4, _:28, _:4/binary, _Src:16/binary,
   Dst:16/binary, _/binary>> = _Pkt}, State) ->
@@ -204,3 +178,31 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+handle_pkt(Ip, Pkt) ->
+  case ets:lookup(?TABLE_PDR_IPV4, Ip) of
+    [#pdr_ipv4_record{pdrs = PDRs}] ->
+      #pdr_record_ref{cert_fingerprint = CF, pdr_id = PdrId} =
+        wpn_srv:get_highest_pdr(PDRs),
+
+      PdrRecordKey = #pdr_record_key{cert_fingerprint = CF, pdr_id = PdrId},
+      #pdr_record{far_id = FarId} = wpn_srv:get_pdr_record(PdrRecordKey),
+
+      FarRecordKey = #far_record_key{cert_fingerprint = CF, far_id = FarId},
+
+      #far_record{apply_actions = ApplyActions,
+        forwarding_params = #forwarding_params{
+          destination_iface = 'DTLS',
+          network_instance = _NI,
+          outer_header_creation = #outer_header_creation{
+            hdr = 'UDP/DTLS/IPv4',
+            sock = DTLSSock
+          }
+        }} = wpn_srv:get_far_record(FarRecordKey),
+
+      case lists:member(forw, ApplyActions) of
+        true -> ssl:send(DTLSSock, Pkt);
+        _ -> ok
+      end,
+      ok;
+    _ -> drop, lager:debug("Dropping data for ~p~n ~p", [Ip, Pkt])
+  end.
